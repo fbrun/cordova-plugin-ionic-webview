@@ -20,6 +20,7 @@
 #import <Cordova/NSDictionary+CordovaPreferences.h>
 #import <MobileCoreServices/MobileCoreServices.h>
 #import <AVFoundation/AVFoundation.h>
+#import <Foundation/Foundation.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
 
@@ -195,13 +196,23 @@
     }
     NSString *userAgent = configuration.applicationNameForUserAgent;
     if ( [settings cordovaSettingForKey:@"OverrideUserAgent"] == nil ) {
-      if ( [settings cordovaSettingForKey:@"AppendUserAgent"] == nil ) {
+        NSString *appendUserAgent = [settings cordovaSettingForKey:@"AppendUserAgent"] != nil ? [settings cordovaSettingForKey:@"AppendUserAgent"] : @"";
         NSString *device = UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPhone ? @"iPhone" : @"iPad";
-        userAgent = [NSString stringWithFormat:@"%@ (%@; CPU OS %@ like Mac OS X)", userAgent, device, [UIDevice.currentDevice.systemVersion stringByReplacingOccurrencesOfString:@"." withString:@"_"]];
-      }
-      if ([settings cordovaSettingForKey:@"AppendUserAgent"] != nil ) {
-        userAgent = [NSString stringWithFormat:@"%@ %@", userAgent, [settings cordovaSettingForKey:@"AppendUserAgent"]];
-      }
+
+        @try {
+            // get original UserAgent string by using temporal webView on iPad
+            WKWebView *tmp = [[WKWebView alloc] init];
+            NSString *originalUA = [tmp valueForKey:@"userAgent"];
+            // create custom UserAgent string
+            userAgent = [NSString stringWithFormat:@"%@ %@", originalUA, appendUserAgent];
+        } @catch (NSException *exception) {
+          NSLog(@"%@ ",exception.name);
+          NSLog(@"Reason: %@ ",exception.reason);
+          userAgent = [NSString stringWithFormat:@"%@ %@ (%@; CPU OS %@ like Mac OS X)", userAgent, appendUserAgent, device, [UIDevice.currentDevice.systemVersion stringByReplacingOccurrencesOfString:@"." withString:@"_"]];
+        }
+        @finally {
+         NSLog(@"Can't detect original safari version from WKWebView");
+        }
     }
     configuration.applicationNameForUserAgent = userAgent;
     configuration.allowsInlineMediaPlayback = [settings cordovaBoolSettingForKey:@"AllowInlineMediaPlayback" defaultValue:YES];
